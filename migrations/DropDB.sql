@@ -1,0 +1,1 @@
+DROP DATABASE fe_task;
