@@ -42,7 +42,7 @@ app.get('/api/accounts/list/', (req, res) => {
     }
     const endLimit = page * pageCount;
     const startLimit = endLimit - pageCount;
-    let queryString = `SELECT a.id, a.login, a.email, a.picture, r.name FROM accounts as a LEFT JOIN role as r ON a.roleId = r.id`;
+    let queryString = `SELECT a.id, a.login, a.email, a.picture, r.name as role, r.code as roleCode FROM accounts as a LEFT JOIN role as r ON a.roleId = r.id`;
     (typeof searchString !== 'undefined') && (queryString = queryString + ` WHERE a.login LIKE '%${searchString}%' OR a.email LIKE '%${searchString}%'`);
     queryString = queryString + ` ORDER BY ${sort} ${order} LIMIT ${startLimit}, ${endLimit};`;
     console.log('final request:', queryString);
