@@ -45,7 +45,18 @@ app.get('/api/accounts/list/', (req, res) => {
     let queryString = `SELECT a.id, a.login, a.email, a.picture, r.name as role, r.code as roleCode FROM accounts as a LEFT JOIN role as r ON a.roleId = r.id`;
     (typeof searchString !== 'undefined') && (queryString = queryString + ` WHERE a.login LIKE '%${searchString}%' OR a.email LIKE '%${searchString}%'`);
     queryString = queryString + ` ORDER BY ${sort} ${order} LIMIT ${startLimit}, ${endLimit};`;
-    console.log('final request:', queryString);
+    connection.query(queryString, [], (err, rows, fields) => {
+        if (err) {
+            res.send(err);
+            throw err;
+        }
+        res.send(rows);
+    });
+});
+
+// Получить значения фильтра по умолчанию
+app.get('/api/accounts/filter-values/', (req, res) => {
+    let queryString = `SELECT code, value FROM filter`;
     connection.query(queryString, [], (err, rows, fields) => {
         if (err) {
             res.send(err);

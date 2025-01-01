@@ -21,3 +21,9 @@ CREATE TABLE accounts (
     roleId INT NOT NULL,
     FOREIGN KEY (roleId) REFERENCES role (id)
 );
+
+CREATE TABLE filter (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(256) NOT NULL,
+    value VARCHAR(256) NOT NULL
+);
