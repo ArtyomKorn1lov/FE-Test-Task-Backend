@@ -27,3 +27,9 @@ CREATE TABLE filter (
     code VARCHAR(256) NOT NULL,
     value VARCHAR(256) NOT NULL
 );
+
+CREATE TABLE pagination (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(256) NOT NULL,
+    value VARCHAR(256) NOT NULL
+);
