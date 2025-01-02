@@ -47,7 +47,6 @@ app.get('/api/accounts/list/', (req, res) => {
     (typeof roleCode !== 'undefined') && (queryString = queryString + ` AND r.code = '${roleCode}'`);
     (typeof searchString !== 'undefined') && (queryString = queryString + ` WHERE a.login LIKE '%${searchString}%'`);
     queryString = queryString + ` ORDER BY ${sort} ${order} LIMIT ${startLimit}, ${endLimit};`;
-    console.log(queryString);
     connection.query(queryString, [], (err, rows, fields) => {
         if (err) {
             res.send(err);
@@ -83,11 +82,16 @@ app.get('/api/accounts/page-nav/', (req, res) => {
 
 // Контекстный поиск в поисковой строке
 app.get('/api/accounts/search', (req, res) => {
-    let queryString = `SELECT a.login FROM accounts as a ORDER BY a.sort ASC LIMIT 50`;
-    let search = req.query.search;
-    if (!!search) {
-        queryString = `SELECT a.login FROM accounts as a WHERE a.login LIKE '%${search}%' ORDER BY a.login ASC LIMIT 50`;
+    const search = req.query.search;
+    const roleCode = req.query.roleCode;
+    let queryString = `SELECT a.login FROM accounts as a`;
+    if (!!roleCode) {
+        queryString = queryString + ` JOIN role as r ON a.roleId = r.id AND r.code = '${roleCode}'`;
     }
+    if (!!search) {
+        queryString = queryString + ` WHERE a.login LIKE '%${search}%'`;
+    }
+    queryString = queryString + ` ORDER BY a.login ASC LIMIT 50`;
     connection.query(queryString, [], (err, rows, fields) => {
         if (err) {
             res.send(err);
