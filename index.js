@@ -2,13 +2,17 @@ const express = require('express');
 const mysql = require('mysql');
 const bodyParser = require('body-parser');
 require("dotenv").config();
+const fileUpload = require('express-fileupload');
+const fs = require('fs');
+const path = require('path');
 
 const connection = mysql.createConnection({
     host: process.env.dbHost,
     user: process.env.dbUser,
     port: process.env.dbPort,
     password: process.env.dbPassword,
-    database: process.env.dbName
+    database: process.env.dbName,
+    multipleStatements: true
 });
 connection.connect();
 
@@ -19,6 +23,12 @@ const port = process.env.serverPort;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(fileUpload({
+    limits: { fileSize: 2 * 1024 * 1024 },
+    useTempFiles : true,
+    tempFileDir : '/tmp/'
+  }));
+app.use(express.static('uploads'));
 
 // Получить список аккаунтов с пагинацией и с поиском
 app.get('/api/accounts/list/', (req, res) => {
@@ -41,17 +51,20 @@ app.get('/api/accounts/list/', (req, res) => {
     } else {
         sort = 'a.' + sort;
     }
-    const endLimit = page * pageCount;
-    const startLimit = endLimit - pageCount;
-    let queryString = `SELECT a.id, a.login, a.email, a.picture, r.name as role, r.code as roleCode FROM accounts as a JOIN role as r ON a.roleId = r.id`;
+    const startLimit = page * pageCount - pageCount;
+    let queryString = `SELECT a.id, a.login, a.email, i.path as picture, r.name as role, r.code as roleCode FROM accounts as a LEFT JOIN image as i ON a.picture = i.id JOIN role as r ON a.roleId = r.id`;
     (typeof roleCode !== 'undefined') && (queryString = queryString + ` AND r.code = '${roleCode}'`);
     (typeof searchString !== 'undefined') && (queryString = queryString + ` WHERE a.login LIKE '%${searchString}%'`);
-    queryString = queryString + ` ORDER BY ${sort} ${order} LIMIT ${startLimit}, ${endLimit};`;
+    queryString = queryString + ` ORDER BY ${sort} ${order} LIMIT ${startLimit}, ${pageCount};`;
     connection.query(queryString, [], (err, rows, fields) => {
         if (err) {
             res.send(err);
             throw err;
         }
+        rows = rows.map((item) => {
+            (!!item.picture) && (item.picture = getImageUrl(req, item.picture));
+            return item;
+        });
         res.send(rows);
     });
 });
@@ -71,6 +84,18 @@ app.get('/api/accounts/filter-values/', (req, res) => {
 // Получить значения пагинации по умолчанию
 app.get('/api/accounts/page-nav/', (req, res) => {
     let queryString = `SELECT code, value FROM pagination`;
+    connection.query(queryString, [], (err, rows, fields) => {
+        if (err) {
+            res.send(err);
+            throw err;
+        }
+        res.send(rows);
+    });
+});
+
+// Получить список всех ролей пользователей
+app.get('/api/accounts/roles/', (req, res) => {
+    let queryString = `SELECT id, code, name FROM role`;
     connection.query(queryString, [], (err, rows, fields) => {
         if (err) {
             res.send(err);
@@ -100,6 +125,111 @@ app.get('/api/accounts/search', (req, res) => {
         res.send(rows);
     });
 });
+
+// Валидация загруженного файла
+app.post('/api/accounts/upload', (req, res) => {
+    if (!req.files || !req.files.file) {
+        return res.status(400).send('No file were uploaded');
+    }
+    const uploadedFile = req.files.file;
+    if (uploadedFile.size === 0) {
+        return res.status(400).send('Uploaded file is empty');
+    }
+    const extentionName = path.extname(uploadedFile.name);
+    if (!fileExtentions.includes(extentionName)) {
+        return res.status(400).send('Incorrectly uploaded file');
+    }
+    return res.send('File was uploaded');
+});
+
+// Создать новый аккаунт
+app.post('/api/accounts/create/', async (req, res) => {
+    let createAccountModel = req.body;
+    if (!!createAccountModel.picture?.file) {
+        await saveImage(createAccountModel.picture?.file, createAccountModel.picture?.name)
+            .then((result) => {
+                createAccountModel.picture = result;
+            })
+            .catch((error) => {
+                return res.status(400).send(error);
+            })
+    }
+    let queryString = `INSERT INTO image (path) VALUES ('${createAccountModel.picture}');`;
+    let imageId = null;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(rows?.insertId);
+        });
+    })
+        .then((result) => {
+            imageId = result;
+        })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+    let maxSortValue = 100;
+    queryString = `SELECT sort FROM accounts ORDER BY sort DESC LIMIT 1;`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(rows[0]?.sort);
+        });
+    })
+        .then((result) => {
+            maxSortValue = result + 1;
+        })
+    queryString = `INSERT INTO accounts (login, email, sort, picture, roleId) VALUES ('${createAccountModel.login}', '${createAccountModel.email}', ${maxSortValue}, ${imageId}, ${createAccountModel.role});`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve('Account is created on server');
+        });
+    })
+        .then((result) => {
+            res.send(result);
+        })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+});
+
+const getImageUrl = (req, publicFilePath) => {
+    return req.protocol + "://" + req.get('host') + publicFilePath;
+} 
+
+const fileExtentions = ['.webp', '.jpg', '.png'];
+
+const saveImage = (fileBase64, nameFile) => {
+    return new Promise((resolve, reject) => {
+        const uploadedFile = fileBase64;
+        if (uploadedFile === null) {
+            reject('Uploaded file is empty');
+        }
+        const extentionName = path.extname(nameFile);
+        if (!fileExtentions.includes(extentionName)) {
+            reject('Incorrectly uploaded file');
+        }
+        const fileName = Date.now() + extentionName;
+        const folderName = __dirname + "/uploads/files/";
+        fs.writeFile(path.join(folderName, fileName), uploadedFile, { encoding: 'base64' }, async (err) => {
+            if (err) {
+                reject('Error saving file');
+            }
+            const savedFilePath = "/files/" + fileName;
+            resolve(savedFilePath);
+        });
+    });
+}
 
 app.listen(port, () => {
     console.log(`Приложение доступно по url: http://localhost:${port}/`)
