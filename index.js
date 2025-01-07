@@ -24,9 +24,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(fileUpload({
-    limits: { fileSize: 2 * 1024 * 1024 },
-    useTempFiles : true,
-    tempFileDir : '/tmp/'
+    limits: { fileSize: 2 * 1024 * 1024 }
   }));
 app.use(express.static('uploads'));
 
@@ -203,11 +201,85 @@ app.post('/api/accounts/create/', async (req, res) => {
         });
 });
 
+// Удалить аккаунт
+app.delete('/api/accounts/delete/:id', async (req, res) => {
+    const id = req.params.id;
+    let queryString = `SELECT a.picture, i.path FROM accounts as a LEFT JOIN image as i ON a.picture = i.id WHERE a.id=${id};`;
+    let fileId = null;
+    let filePath = null;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve({
+                fileId: rows[0]?.picture,
+                path: rows[0]?.path
+            });
+        });
+    })
+        .then((result) => {
+            fileId = result?.fileId;
+            filePath = result?.path
+        })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+    queryString = `DELETE FROM accounts WHERE id=${id};`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(true);
+        });
+    })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+    if (!!fileId) {
+        await removeImage(res, fileId, filePath);
+    } else {
+        res.send('Account successfully deleted');
+    }
+});
+
 const getImageUrl = (req, publicFilePath) => {
     return req.protocol + "://" + req.get('host') + publicFilePath;
 } 
 
 const fileExtentions = ['.webp', '.jpg', '.png'];
+
+// Удалить картинку из БД и файловой системы
+const removeImage = async (res, fileId, filePath) => {
+    let successDeleteImageDatabase = false;
+    const queryString = `DELETE FROM image WHERE id=${fileId};`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(true);
+        });
+    })
+        .then((result) => {
+            successDeleteImageDatabase = result;
+        })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+    (!!successDeleteImageDatabase)
+        && await deleteImage(filePath)
+            .then((response) => {
+                !!response && res.send('Account successfully deleted');
+            })
+            .catch((error) => {
+                res.status(400).send(error);
+            });
+}
 
 const saveImage = (fileBase64, nameFile) => {
     return new Promise((resolve, reject) => {
@@ -227,6 +299,18 @@ const saveImage = (fileBase64, nameFile) => {
             }
             const savedFilePath = "/files/" + fileName;
             resolve(savedFilePath);
+        });
+    });
+}
+
+const deleteImage = (filePath) => {
+    return new Promise((resolve, reject) => {
+        const folderName = __dirname + "/uploads/";
+        fs.unlink(path.join(folderName, filePath), async (err) => {
+            if (err) {
+                reject('Error delete file');
+            }
+            resolve(true);
         });
     });
 }
