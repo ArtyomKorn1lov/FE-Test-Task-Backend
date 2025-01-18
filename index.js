@@ -143,8 +143,9 @@ app.post('/api/accounts/upload', (req, res) => {
 // Создать новый аккаунт
 app.post('/api/accounts/create/', async (req, res) => {
     let createAccountModel = req.body;
-    if (!!createAccountModel.picture?.file) {
-        await saveImage(createAccountModel.picture?.file, createAccountModel.picture?.name)
+    const pictureFile = createAccountModel.picture?.file;
+    if (!!pictureFile) {
+        await saveImage(pictureFile, createAccountModel.picture?.name)
             .then((result) => {
                 createAccountModel.picture = result;
             })
@@ -152,23 +153,25 @@ app.post('/api/accounts/create/', async (req, res) => {
                 return res.status(400).send(error);
             })
     }
-    let queryString = `INSERT INTO image (path) VALUES ('${createAccountModel.picture}');`;
     let imageId = null;
-    await new Promise((resolve, reject) => {
-        connection.query(queryString, [], (err, rows, fields) => {
-            if (err) {
-                reject(err);
-                throw err;
-            }
-            resolve(rows?.insertId);
-        });
-    })
-        .then((result) => {
-            imageId = result;
+    if (!!pictureFile) {
+        let queryString = `INSERT INTO image (path) VALUES ('${createAccountModel.picture}');`;
+        await new Promise((resolve, reject) => {
+            connection.query(queryString, [], (err, rows, fields) => {
+                if (err) {
+                    reject(err);
+                    throw err;
+                }
+                resolve(rows?.insertId);
+            });
         })
-        .catch((error) => {
-            res.status(400).send(error);
-        });
+            .then((result) => {
+                imageId = result;
+            })
+            .catch((error) => {
+                res.status(400).send(error);
+            });
+    }
     let maxSortValue = 100;
     queryString = `SELECT sort FROM accounts ORDER BY sort DESC LIMIT 1;`;
     await new Promise((resolve, reject) => {
@@ -204,29 +207,40 @@ app.post('/api/accounts/create/', async (req, res) => {
 // Удалить аккаунт
 app.delete('/api/accounts/delete/:id', async (req, res) => {
     const id = req.params.id;
-    let queryString = `SELECT a.picture, i.path FROM accounts as a LEFT JOIN image as i ON a.picture = i.id WHERE a.id=${id};`;
-    let fileId = null;
-    let filePath = null;
+    await deleteAccounts([id], res);
+});
+
+// Удалить несколько аккаунтов
+app.post('/api/accounts/delete/', async (req, res) => {
+    let accountsDeleteModel = req.body.ids;
+    await deleteAccounts(accountsDeleteModel, res);
+});
+
+// Удаление аккаунта из БД и привязанного файла из файловой системы
+const deleteAccounts = async (arIds, res) => {
+    const strIds = arIds.toString();
+    let queryString = `SELECT a.picture, i.path FROM accounts as a LEFT JOIN image as i ON a.picture = i.id WHERE a.id IN (${strIds});`;
+    let arFileIds = [];
+    let arFilesPath = [];
     await new Promise((resolve, reject) => {
         connection.query(queryString, [], (err, rows, fields) => {
             if (err) {
                 reject(err);
                 throw err;
             }
-            resolve({
-                fileId: rows[0]?.picture,
-                path: rows[0]?.path
-            });
+            resolve(rows);
         });
     })
         .then((result) => {
-            fileId = result?.fileId;
-            filePath = result?.path
+            result?.forEach((item) => {
+                arFileIds.push(item.picture);
+                arFilesPath.push(item.path);
+            });
         })
         .catch((error) => {
             res.status(400).send(error);
         });
-    queryString = `DELETE FROM accounts WHERE id=${id};`;
+    queryString = `DELETE FROM accounts WHERE id IN (${strIds});`;
     await new Promise((resolve, reject) => {
         connection.query(queryString, [], (err, rows, fields) => {
             if (err) {
@@ -239,12 +253,12 @@ app.delete('/api/accounts/delete/:id', async (req, res) => {
         .catch((error) => {
             res.status(400).send(error);
         });
-    if (!!fileId) {
-        await removeImage(res, fileId, filePath);
+    if (!!arFileIds && arFileIds.length > 0) {
+        await removeImage(res, arFileIds, arFilesPath); 
     } else {
         res.send('Account successfully deleted');
     }
-});
+}
 
 const getImageUrl = (req, publicFilePath) => {
     return req.protocol + "://" + req.get('host') + publicFilePath;
@@ -253,9 +267,14 @@ const getImageUrl = (req, publicFilePath) => {
 const fileExtentions = ['.webp', '.jpg', '.png'];
 
 // Удалить картинку из БД и файловой системы
-const removeImage = async (res, fileId, filePath) => {
+const removeImage = async (res, arFileIds, arFilesPath) => {
+    let strIds = [];
+    arFileIds.forEach((item) => {
+        !!item && (strIds.push(item));
+    });
+    strIds = strIds.toString();
     let successDeleteImageDatabase = false;
-    const queryString = `DELETE FROM image WHERE id=${fileId};`;
+    const queryString = `DELETE FROM image WHERE id IN (${strIds});`;
     await new Promise((resolve, reject) => {
         connection.query(queryString, [], (err, rows, fields) => {
             if (err) {
@@ -271,14 +290,29 @@ const removeImage = async (res, fileId, filePath) => {
         .catch((error) => {
             res.status(400).send(error);
         });
-    (!!successDeleteImageDatabase)
-        && await deleteImage(filePath)
-            .then((response) => {
-                !!response && res.send('Account successfully deleted');
+    if (!!successDeleteImageDatabase) {
+        let isSuccessDelete = false;
+        await new Promise((resolve, reject) => {
+            arFilesPath.forEach(async (item) => {
+                await deleteImage(item)
+                    .then((response) => {
+                        resolve(response);
+                    })
+                    .catch((error) => {
+                        reject(error);
+                    });
+            });
+        })
+            .then((result) => {
+                isSuccessDelete = result;
             })
             .catch((error) => {
                 res.status(400).send(error);
             });
+        !!isSuccessDelete
+            ? res.send('Account successfully deleted')
+            : res.status(400).send('Error delete account image');
+    }
 }
 
 const saveImage = (fileBase64, nameFile) => {
