@@ -28,7 +28,10 @@ app.use(fileUpload({
   }));
 app.use(express.static('uploads'));
 
-// Получить список аккаунтов с пагинацией и с поиском
+// Доступные для загрузки расширения файлов
+const fileExtentions = ['.webp', '.jpg', '.png'];
+
+// Получить список аккаунтов по фильтру, с пагинацией
 app.get('/api/accounts/list/', (req, res) => {
     let page = req.query.page;
     let pageCount = req.query.pageCount;
@@ -143,57 +146,16 @@ app.post('/api/accounts/upload', (req, res) => {
 // Создать новый аккаунт
 app.post('/api/accounts/create/', async (req, res) => {
     let createAccountModel = req.body;
-    const pictureFile = createAccountModel.picture?.file;
-    if (!!pictureFile) {
-        await saveImage(pictureFile, createAccountModel.picture?.name)
-            .then((result) => {
-                createAccountModel.picture = result;
-            })
-            .catch((error) => {
-                return res.status(400).send(error);
-            })
-    }
-    let imageId = null;
-    if (!!pictureFile) {
-        let queryString = `INSERT INTO image (path) VALUES ('${createAccountModel.picture}');`;
-        await new Promise((resolve, reject) => {
-            connection.query(queryString, [], (err, rows, fields) => {
-                if (err) {
-                    reject(err);
-                    throw err;
-                }
-                resolve(rows?.insertId);
-            });
-        })
-            .then((result) => {
-                imageId = result;
-            })
-            .catch((error) => {
-                res.status(400).send(error);
-            });
-    }
-    let maxSortValue = 100;
-    queryString = `SELECT sort FROM accounts ORDER BY sort DESC LIMIT 1;`;
+    const imageId = await saveAccountImage(createAccountModel, res);
+    const maxSortValue = await getMaxSortValue();
+    const queryString = `INSERT INTO accounts (login, email, sort, picture, roleId) VALUES ('${createAccountModel.login}', '${createAccountModel.email}', ${maxSortValue}, ${imageId}, ${createAccountModel.role});`;
     await new Promise((resolve, reject) => {
         connection.query(queryString, [], (err, rows, fields) => {
             if (err) {
                 reject(err);
                 throw err;
             }
-            resolve(rows[0]?.sort);
-        });
-    })
-        .then((result) => {
-            maxSortValue = result + 1;
-        })
-    queryString = `INSERT INTO accounts (login, email, sort, picture, roleId) VALUES ('${createAccountModel.login}', '${createAccountModel.email}', ${maxSortValue}, ${imageId}, ${createAccountModel.role});`;
-    await new Promise((resolve, reject) => {
-        connection.query(queryString, [], (err, rows, fields) => {
-            if (err) {
-                reject(err);
-                throw err;
-            }
-            resolve('Account is created on server');
+            resolve('Account is successfuly created on server');
         });
     })
         .then((result) => {
@@ -212,9 +174,145 @@ app.delete('/api/accounts/delete/:id', async (req, res) => {
 
 // Удалить несколько аккаунтов
 app.post('/api/accounts/delete/', async (req, res) => {
-    let accountsDeleteModel = req.body.ids;
+    const accountsDeleteModel = req.body.ids;
     await deleteAccounts(accountsDeleteModel, res);
 });
+
+// Получить аккаунт по его id
+app.get('/api/accounts/:id', async (req, res) => {
+    const id = req.params.id;
+    const queryString = `SELECT a.id, a.login, a.email, a.roleId as role, i.id as imageId, i.path as imagePath FROM accounts as a LEFT JOIN image as i ON a.picture = i.id WHERE a.id = ${id};`;
+    connection.query(queryString, [], (err, rows, fields) => {
+        if (err) {
+            res.send(err);
+            throw err;
+        }
+        if (!rows || rows.length <= 0) {
+            return {};
+        }
+        let accountEditModel = rows[0];
+        const imageUrl = !!accountEditModel.imagePath ? getImageUrl(req, accountEditModel.imagePath) : null;
+        accountEditModel = {
+            id: accountEditModel.id,
+            login: accountEditModel.login,
+            email: accountEditModel.email,
+            picture: {
+                id: accountEditModel.imageId,
+                url: imageUrl,
+                file: null,
+                name: ''
+            },
+            role: accountEditModel.role
+        };
+        res.send(accountEditModel);
+    });
+});
+
+// Редактирование аккаунта
+app.put('/api/accounts/edit/', async (req, res) => {
+    let editAccountModel = req.body;
+    let imageId = null;
+    !editAccountModel.picture?.id 
+        ? (imageId = await updateImage(editAccountModel, res))
+        : (imageId = editAccountModel.picture?.id);
+    const queryString = `UPDATE accounts SET login='${editAccountModel.login}', email='${editAccountModel.email}', picture=${imageId}, roleId=${editAccountModel.role} WHERE id=${editAccountModel.id};`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve('Account is successfuly updated on server');
+        });
+    })
+        .then((result) => {
+            res.send(result);
+        })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+});
+
+// Получить url изображения на сервере
+const getImageUrl = (req, publicFilePath) => {
+    return req.protocol + "://" + req.get('host') + publicFilePath;
+} 
+
+// Сохранить изображение в таблицу и в файловую систему
+const saveAccountImage = async (createAccountModel, res) => {
+    const pictureFile = createAccountModel.picture?.file;
+    if (!!pictureFile) {
+        await saveImage(pictureFile, createAccountModel.picture?.name)
+            .then((result) => {
+                createAccountModel.picture = result;
+            })
+            .catch((error) => {
+                return res.status(400).send(error);
+            })
+    }
+    let imageId = null;
+    if (!!pictureFile) {
+        const queryString = `INSERT INTO image (path) VALUES ('${createAccountModel.picture}');`;
+        await new Promise((resolve, reject) => {
+            connection.query(queryString, [], (err, rows, fields) => {
+                if (err) {
+                    reject(err);
+                    throw err;
+                }
+                resolve(rows?.insertId);
+            });
+        })
+            .then((result) => {
+                imageId = result;
+            })
+            .catch((error) => {
+                res.status(400).send(error);
+            });
+    }
+    return imageId;
+}
+
+// Сохранить изображение в файловую систему
+const saveImage = (fileBase64, nameFile) => {
+    return new Promise((resolve, reject) => {
+        const uploadedFile = fileBase64;
+        if (uploadedFile === null) {
+            reject('Uploaded file is empty');
+        }
+        const extentionName = path.extname(nameFile);
+        if (!fileExtentions.includes(extentionName)) {
+            reject('Incorrectly uploaded file');
+        }
+        const fileName = Date.now() + extentionName;
+        const folderName = __dirname + "/uploads/files/";
+        fs.writeFile(path.join(folderName, fileName), uploadedFile, { encoding: 'base64' }, async (err) => {
+            if (err) {
+                reject('Error saving file');
+            }
+            const savedFilePath = "/files/" + fileName;
+            resolve(savedFilePath);
+        });
+    });
+}
+
+// Получить максимальное значение поля sort
+const getMaxSortValue = async () => {
+    let maxSortValue = 100;
+    const queryString = `SELECT sort FROM accounts ORDER BY sort DESC LIMIT 1;`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(rows[0]?.sort);
+        });
+    })
+        .then((result) => {
+            maxSortValue = result + 1;
+        });
+    return maxSortValue;
+}
 
 // Удаление аккаунта из БД и привязанного файла из файловой системы
 const deleteAccounts = async (arIds, res) => {
@@ -233,6 +331,9 @@ const deleteAccounts = async (arIds, res) => {
     })
         .then((result) => {
             result?.forEach((item) => {
+                if (!item.picture || !item.path) {
+                    return;
+                }
                 arFileIds.push(item.picture);
                 arFilesPath.push(item.path);
             });
@@ -254,17 +355,14 @@ const deleteAccounts = async (arIds, res) => {
             res.status(400).send(error);
         });
     if (!!arFileIds && arFileIds.length > 0) {
-        await removeImage(res, arFileIds, arFilesPath); 
+        const isSuccessDelete = await removeImage(res, arFileIds, arFilesPath); 
+        !!isSuccessDelete
+            ? res.send('Account successfully deleted')
+            : res.status(400).send('Error delete account image');
     } else {
         res.send('Account successfully deleted');
     }
 }
-
-const getImageUrl = (req, publicFilePath) => {
-    return req.protocol + "://" + req.get('host') + publicFilePath;
-} 
-
-const fileExtentions = ['.webp', '.jpg', '.png'];
 
 // Удалить картинку из БД и файловой системы
 const removeImage = async (res, arFileIds, arFilesPath) => {
@@ -309,34 +407,12 @@ const removeImage = async (res, arFileIds, arFilesPath) => {
             .catch((error) => {
                 res.status(400).send(error);
             });
-        !!isSuccessDelete
-            ? res.send('Account successfully deleted')
-            : res.status(400).send('Error delete account image');
+        return isSuccessDelete;
     }
+    return false;
 }
 
-const saveImage = (fileBase64, nameFile) => {
-    return new Promise((resolve, reject) => {
-        const uploadedFile = fileBase64;
-        if (uploadedFile === null) {
-            reject('Uploaded file is empty');
-        }
-        const extentionName = path.extname(nameFile);
-        if (!fileExtentions.includes(extentionName)) {
-            reject('Incorrectly uploaded file');
-        }
-        const fileName = Date.now() + extentionName;
-        const folderName = __dirname + "/uploads/files/";
-        fs.writeFile(path.join(folderName, fileName), uploadedFile, { encoding: 'base64' }, async (err) => {
-            if (err) {
-                reject('Error saving file');
-            }
-            const savedFilePath = "/files/" + fileName;
-            resolve(savedFilePath);
-        });
-    });
-}
-
+// Удалить картинку из файловой системы
 const deleteImage = (filePath) => {
     return new Promise((resolve, reject) => {
         const folderName = __dirname + "/uploads/";
@@ -347,6 +423,47 @@ const deleteImage = (filePath) => {
             resolve(true);
         });
     });
+}
+
+// Обновить загруженную картинку
+const updateImage = async (editAccountModel, res) => {
+    let pictureId = null;
+    let picturePath = null;
+    let queryString = `SELECT a.picture, i.path FROM accounts as a LEFT JOIN image as i ON a.picture = i.id WHERE a.id=${editAccountModel.id};`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(rows);
+        });
+    })
+        .then((result) => {
+            pictureId = result[0]?.picture;
+            picturePath = result[0]?.path;
+        })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+    queryString = `UPDATE accounts SET picture=${null} WHERE id=${editAccountModel.id};`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryString, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve(true);
+        });
+    })
+        .catch((error) => {
+            res.status(400).send(error);
+        });
+    if (!!pictureId && !!picturePath) {
+        const isSuccessDelete = await removeImage(res, [pictureId], [picturePath]);
+        !isSuccessDelete && res.status(400).send('Error delete account image');
+    }
+    return await saveAccountImage(editAccountModel, res);
 }
 
 app.listen(port, () => {
