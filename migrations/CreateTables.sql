@@ -2,13 +2,13 @@ USE fe_task;
 
 CREATE TABLE image (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    path TEXT NOT NULL,
+    path TEXT NOT NULL
 );
 
 CREATE TABLE role (
     id INT PRIMARY KEY AUTO_INCREMENT,
     code VARCHAR(256) NOT NULL,
-    name VARCHAR(256) NOT NULL,
+    name VARCHAR(256) NOT NULL
 );
 
 CREATE TABLE accounts (
