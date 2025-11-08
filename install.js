@@ -15,7 +15,8 @@ const execute = async () => {
     let connection = mysql.createConnection(database_config);
     connection.connect();
 
-    const createDB_sql = fs.readFileSync('./migrations/CreateDB.sql').toString();
+    // Создание БД
+    const createDB_sql = fs.readFileSync(`${__dirname}/migrations/CreateDB.sql`).toString();
     await new Promise((resolve, reject) => {
         connection.query(createDB_sql, [], (err, rows, fields) => {
             if (err) {
@@ -36,6 +37,7 @@ const execute = async () => {
 
     connection.connect();
 
+    // Создание таблиц
     const createTables_sql = fs.readFileSync(`${__dirname}/migrations/CreateTables.sql`).toString();
     await new Promise((resolve, reject) => {
         connection.query(createTables_sql, [], (err, rows, fields) => {
@@ -47,6 +49,7 @@ const execute = async () => {
         });
     });
 
+    // Создание папки на сервере
     fs.mkdirSync(`${__dirname}/uploads/files/`, { recursive: true });
 
     const filterData = JSON.parse(fs.readFileSync(`${__dirname}/migrations/data/filter.json`).toString());
@@ -54,6 +57,7 @@ const execute = async () => {
     const rolesData = JSON.parse(fs.readFileSync(`${__dirname}/migrations/data/roles.json`).toString());
     const accountsData = JSON.parse(fs.readFileSync(`${__dirname}/migrations/data/accounts.json`).toString());
 
+    // Элементы таблицы filter
     for (const item of filterData) {
         const queryString = `INSERT INTO filter (code, value) VALUES ('${item.code}', '${item.value}');`;
         await new Promise((resolve, reject) => {
@@ -67,6 +71,7 @@ const execute = async () => {
         });
     }
 
+    // Элементы таблицы pagination
     for (const item of paginationData) {
         const queryString = `INSERT INTO pagination (code, value) VALUES ('${item.code}', '${item.value}');`;
         await new Promise((resolve, reject) => {
@@ -80,6 +85,7 @@ const execute = async () => {
         });
     }
 
+    // Элементы таблицы role
     for (const item of rolesData) {
         const queryString = `INSERT INTO role (code, name) VALUES ('${item.code}', '${item.name}');`;
         await new Promise((resolve, reject) => {
@@ -93,6 +99,7 @@ const execute = async () => {
         });
     }
 
+    // Получить список полей пользователей
     const queryString = `SELECT id, code FROM role`;
     const roles = await new Promise((resolve, reject) => {
         connection.query(queryString, [], (err, rows, fields) => {
@@ -108,6 +115,7 @@ const execute = async () => {
         });
     });
 
+    // Добавление списка аккаунтов
     for (const item of accountsData) {
         let roleId = null;
         for (let key in roles) {
@@ -164,7 +172,7 @@ const execute = async () => {
         });
     }
 
-    console.log('App installed successfully press ctrl + c to continue')
+    console.log('App installed successfully press ctrl + c to continue');
 }
 
 execute();

@@ -45,7 +45,7 @@ app.get('/api/accounts/list/', (req, res) => {
     }
     if (!sort || !order) {
         sort = 'sort';
-        order = 'ASC'
+        order = 'ASC';
     }
     if (sort === 'permission') {
         sort = 'r.name';
@@ -467,5 +467,5 @@ const updateImage = async (editAccountModel, res) => {
 }
 
 app.listen(port, () => {
-    console.log(`The application is available at the following URL: http://localhost:${port}/`)
+    console.log(`The application is available at the following port: ${port}`)
 });

@@ -1,18 +1,18 @@
 [
   {
     "code": "manager",
-    "name ": "Account manager"
+    "name": "Account manager"
   },
   {
     "code": "admin",
-    "name ": "Admin"
+    "name": "Admin"
   },
   {
     "code": "agent",
-    "name ": "Agent"
+    "name": "Agent"
   },
   {
     "code": "reviewer",
-    "name ": "External reviewer"
+    "name": "External reviewer"
   }
 ]
