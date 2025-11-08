@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "install": "node install.js"
   },
   "author": "",
   "license": "ISC",

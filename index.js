@@ -309,7 +309,7 @@ const getMaxSortValue = async () => {
         });
     })
         .then((result) => {
-            maxSortValue = result + 1;
+            !!result && (maxSortValue = result + 1);
         });
     return maxSortValue;
 }
@@ -467,5 +467,5 @@ const updateImage = async (editAccountModel, res) => {
 }
 
 app.listen(port, () => {
-    console.log(`Приложение доступно по url: http://localhost:${port}/`)
+    console.log(`The application is available at the following URL: http://localhost:${port}/`)
 });
