@@ -140,7 +140,9 @@ app.post('/api/accounts/upload', (req, res) => {
     if (!fileExtentions.includes(extentionName)) {
         return res.status(400).send('Incorrectly uploaded file');
     }
-    return res.send('File was uploaded');
+    return res.send({
+        message: 'File was uploaded'
+    });
 });
 
 // Создать новый аккаунт
@@ -155,7 +157,9 @@ app.post('/api/accounts/create/', async (req, res) => {
                 reject(err);
                 throw err;
             }
-            resolve('Account is successfuly created on server');
+            resolve({
+                message: 'Account is successfuly created on server'
+            });
         });
     })
         .then((result) => {
@@ -222,7 +226,9 @@ app.put('/api/accounts/edit/', async (req, res) => {
                 reject(err);
                 throw err;
             }
-            resolve('Account is successfuly updated on server');
+            resolve({
+                message: 'Account is successfuly updated on server'
+            });
         });
     })
         .then((result) => {
@@ -357,10 +363,14 @@ const deleteAccounts = async (arIds, res) => {
     if (!!arFileIds && arFileIds.length > 0) {
         const isSuccessDelete = await removeImage(res, arFileIds, arFilesPath); 
         !!isSuccessDelete
-            ? res.send('Account successfully deleted')
+            ? res.send({
+                message: 'Account successfully deleted'
+            })
             : res.status(400).send('Error delete account image');
     } else {
-        res.send('Account successfully deleted');
+        res.send({
+            message: 'Account successfully deleted'
+        });
     }
 }
 
