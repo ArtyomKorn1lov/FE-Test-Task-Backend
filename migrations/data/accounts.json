@@ -1,0 +1,72 @@
+[
+  {
+    "login": "Account Manager",
+    "email": "account@sunrise.com",
+    "sort": 1,
+    "picture": "picture_0.webp",
+    "role": "manager"
+  },
+  {
+    "login": "Karen Marie Ørsted Andersen",
+    "email": "karen.andersen@sunrise.com",
+    "sort": 2,
+    "picture": "picture_1.webp",
+    "role": "manager"
+  },
+  {
+    "login": "Wendy Russell",
+    "email": "wendy.russell@sunrise.com",
+    "sort": 3,
+    "picture": "picture_2.webp",
+    "role": "admin"
+  },
+  {
+    "login": "Gladys Cooper",
+    "email": "gladys.cooper@sunrise.com",
+    "sort": 4,
+    "picture": "picture_3.webp",
+    "role": "admin"
+  },
+  {
+    "login": "Gloria Fischer",
+    "email": "gloria.fischer@sunrise.com",
+    "sort": 5,
+    "picture": "picture_4.webp",
+    "role": "agent"
+  },
+  {
+    "login": "Arthur Pena",
+    "email": "arthur.pena@sunrise.com",
+    "sort": 6,
+    "picture": "picture_5.webp",
+    "role": "agent"
+  },
+  {
+    "login": "Clémentine Louis",
+    "email": "clementine.louis@sunrise.com",
+    "sort": 7,
+    "picture": "picture_6.webp",
+    "role": "agent"
+  },
+  {
+    "login": "Francisco Lane",
+    "email": "francisco.lane@sunrise.com",
+    "sort": 8,
+    "picture": "picture_7.webp",
+    "role": "agent"
+  },
+  {
+    "login": "Darrell Richards",
+    "email": "darrell.richards@sunrise.com",
+    "sort": 9,
+    "picture": "picture_8.webp",
+    "role": "agent"
+  },
+  {
+    "login": "Max Hawkins",
+    "email": "max.hawkins@sunrise.com",
+    "sort": 10,
+    "picture": "picture_9.webp",
+    "role": "reviewer"
+  }
+]
