@@ -9,7 +9,8 @@
 - Функционал: базовый CRUD, фильтрация, сортировка, пагинация, загрузка файлов
 - Доступно развёртывание в Docker
 
-### Cсылка на реозиторий с frontend - https://github.com/ArtyomKorn1lov/FE-Test-Task-Frontend
+### Cсылка на репозиторий с frontend - https://github.com/ArtyomKorn1lov/FE-Test-Task-Frontend
+### Cсылка на репозиторий с docker compose - https://github.com/ArtyomKorn1lov/FE-Test-Task-Docker-Compose
 
 ## Мануальная установка проекта:
 
@@ -22,7 +23,11 @@ npm install
 ### Установка приложения, запуск миграций
 
 ```sh
-npm run install
+npm run install:app
+```
+#### Или
+```sh
+sh install.sh
 ```
 
 ### Запуск приложения для разработки

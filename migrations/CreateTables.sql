@@ -1,5 +1,11 @@
 USE fe_task;
 
+CREATE TABLE settings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(256) NOT NULL,
+    value BOOLEAN NOT NULL
+);
+
 CREATE TABLE image (
     id INT PRIMARY KEY AUTO_INCREMENT,
     path TEXT NOT NULL

@@ -37,6 +37,24 @@ const execute = async () => {
 
     connection.connect();
 
+    let queryStringSettings = `SELECT s.code, s.value FROM settings as s WHERE s.code = 'installed' AND s.value = true;`;
+    const isInstalled = await new Promise((resolve, reject) => {
+        connection.query(queryStringSettings, [], (err, rows, fields) => {
+            if (err) {
+                resolve(false);
+            }
+            if (!!rows && rows.length > 0) {
+                resolve(true);
+            }
+            resolve(false);
+        });
+    });
+    if (isInstalled) {
+        console.log('App already installed');
+        process.exit();
+        return;
+    }
+
     // Создание таблиц
     const createTables_sql = fs.readFileSync(`${__dirname}/migrations/CreateTables.sql`).toString();
     await new Promise((resolve, reject) => {
@@ -172,7 +190,20 @@ const execute = async () => {
         });
     }
 
-    console.log('App installed successfully press ctrl + c to continue');
+    // Установка флага, что приложение было установлено
+    queryStringSettings = `INSERT INTO settings (code, value) VALUES ('installed', true);`;
+    await new Promise((resolve, reject) => {
+        connection.query(queryStringSettings, [], (err, rows, fields) => {
+            if (err) {
+                reject(err);
+                throw err;
+            }
+            resolve();
+        });
+    });
+
+    console.log('App installed successfully');
+    process.exit();
 }
 
 execute();
