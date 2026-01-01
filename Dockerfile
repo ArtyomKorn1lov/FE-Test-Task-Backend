@@ -4,7 +4,7 @@ COPY . /app
 
 WORKDIR /app
 
-EXPOSE 3000
+EXPOSE 80
 
 RUN rm -rf node_modules
 RUN npm cache clean --force
